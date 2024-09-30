@@ -71,19 +71,31 @@ class Transactf(ScrolledText):
             self.tag_configure(tagname,background='red')
          linenum = linenum + 1
 
+#TODO undo
    def textclick(self, event):
       index = event.widget.index("@%d,%d" % (event.x, event.y))
       (row, col) = index.split('.')
-      if self.parent.cats.selline != 0:
+      if 0 < self.parent.cats.selline <= len(self.catdat.catlist):
          newcat = self.catdat.catlist[self.parent.cats.selline - 1]
          self.changecat(row, newcat)
+
+   def editcat(self, oldcat, newcat):
+      linenum = 1
+      for l in self.transactions:
+         tagname = "line" + str(linenum)
+         place = self.tag_ranges(tagname) #should be just one range
+         cat = self.get(place[0], place[1])
+         if oldcat == cat:
+            self.changecat(linenum, newcat)
+         linenum = linenum + 1
+
 
    def changecat(self, linenum, newcat):
       tagname = "line" + str(linenum)
       place = self.tag_ranges(tagname) #should be just one range
       oldcat = self.get(place[0], place[1])
-      self.delete(place[0], place[1])
-      self.insert(place[0], newcat, tagname)
+      self.delete(place[0], place[1]) 
+      self.insert(place[0], newcat, tagname) 
       self.labeledlist[str(linenum)] = newcat
       self.tag_configure(tagname, background='green')
 
@@ -170,9 +182,9 @@ class Catf(ScrolledText):
         #set all tags to normal background
       taglist = self.tag_names()
       for tag in taglist:
-         self.tag_configure(tag,background='white')
+         self.tag_configure(tag,foreground='black')
       tagname = "line" + str(row)
-      self.tag_configure(tagname,background='blue')
+      self.tag_configure(tagname,foreground='blue')
       self.selline = int(row)
 #TODO: can selline be larger than number of cats in window?
 
@@ -193,12 +205,14 @@ class Optft(tk.Frame):
       quitbutton = tk.Button(self,text="quit")
       quitbutton.grid(row=3,column=0)
 
+#TODO undo
    def addmatch(self):
       new = self.parent.tframe.get(tk.SEL_FIRST, tk.SEL_LAST).lower()
       catnum = self.parent.cats.selline
       if catnum != 0:
          self.catdat.addmatch(catnum - 1, new)
 
+#TODO undo
    def recalc(self):
       self.parent.tframe.reloadtransact()
 
@@ -225,18 +239,22 @@ class Optfc(tk.Frame):
       self.editc.grid(row=2,column=0)
       self.editm = tk.Button(self,text="edit match", command=self.editmatchbutton)
       self.editm.grid(row=3,column=0)
-      self.edits = tk.Button(self,text="sort", command=self.editmatchbutton)
+      self.edits = tk.Button(self,text="sort", command=self.sortcats)
       self.edits.grid(row=4,column=0)
       self.edith = tk.Button(self,text="help", command=self.helpbutton)
       self.edith.grid(row=5,column=0,sticky='s')
 
+#TODO undo
    def addcatsbutton(self):
       y = Catedit(self.parent, self.catdat, 0)
 
+#TODO undo
    def delcatsbutton(self):
       pos = self.parent.cats.selline
-      if pos > 0:
+      if pos > 0 and len(self.catdat.catlist) >= pos:
+         cat = self.catdat.catlist[pos - 1]
          self.catdat.delfromcatlist(pos - 1) #line to index
+         self.parent.tframe.editcat(cat, ' ')
          self.parent.cats.resetcatlist()
 #TODO Error window that cat not selected
 
@@ -252,9 +270,14 @@ class Optfc(tk.Frame):
          y = Matchedit(self.parent, self.catdat, pos)
 #TODO Error window that cat not selected
 
+#TODO undo
+   def sortcats(self):
+      print("implement category sort")
+
    def helpbutton(self):
       y = Helpwin(self)
 
+#TODO undo
 class Catedit(tk.Toplevel):
    def __init__(self, root, category, position):
       super().__init__()
@@ -268,8 +291,12 @@ class Catedit(tk.Toplevel):
       self.okb.grid(row=0,column=1)
       self.tbox = tk.Entry(self)
       self.tbox.grid(row=1,column=0,columnspan=2)
+      self.tbox.bind("<Return>", self.enterpressed)
       if self.position > 0:  #editing an existing
          self.tbox.insert(tk.END, self.catdat.catlist[position - 1])
+
+   def enterpressed(self, key):
+      self.ok()
 
    def ok(self):
       if self.position == 0:
@@ -284,6 +311,7 @@ class Catedit(tk.Toplevel):
       self.destroy()
       self.update()
 
+#TODO undo
 class Matchedit(tk.Toplevel):
    def __init__(self, root, category, catline):
       super().__init__()
@@ -296,11 +324,15 @@ class Matchedit(tk.Toplevel):
       self.okb.grid(row=0,column=1)
       self.tbox = ScrolledText(self, height=15, width=60)
       self.tbox.grid(row=1,column=0,columnspan=2)
+      self.tbox.bind("<Return>", self.enterpressed)
       self.catpos = catline - 1
       matches = self.root.category.getcurrentmatches(self.catpos)
       for e in matches:
          self.tbox.insert(tk.END, e)
          self.tbox.insert(tk.END, '\n')
+
+   def enterpressed(self, key):
+      self.ok()
 
    def ok(self):
 #self.root.category.addtocatlist(self.tbox.get())
